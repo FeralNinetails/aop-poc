@@ -13,11 +13,16 @@ import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 @Aspect
 @Component
@@ -46,16 +51,34 @@ public class RestTemplateAspect {
         MethodBasedEvaluationContext context = new MethodBasedEvaluationContext(
                 joinPoint.getTarget(), method, args, parameterNameDiscoverer);
 
-        // We can use #url directly because of args(url, ..) and MethodBasedEvaluationContext
         Boolean shouldLogAndMetric = filterExpression.getValue(context, Boolean.class);
 
-        if (Boolean.TRUE.equals(shouldLogAndMetric)) {
-            log.info("Interception! RestTemplate request to: {}", urlString);
-            meterRegistry.counter("rest.template.requests",
-                    Collections.singletonList(Tag.of("url", urlString)))
-                    .increment();
+
+
+        Object result;
+        HttpStatusCode status = HttpStatus.OK;
+        try {
+            result = joinPoint.proceed();
+            if (result instanceof ResponseEntity) {
+                status = ((ResponseEntity<?>) result).getStatusCode();
+            }
+        } catch (HttpStatusCodeException e) {
+            status = e.getStatusCode();
+            throw e;
+        } catch (Throwable e) {
+            status = HttpStatus.BAD_REQUEST;
+            throw e;
+        } finally {
+            if (Boolean.TRUE.equals(shouldLogAndMetric)) {
+                List<Tag> tags = new ArrayList<>();
+                tags.add(Tag.of("url", urlString));
+                tags.add(Tag.of("status", String.valueOf(status.value())));
+                
+                meterRegistry.counter("rest.template.requests", tags).increment();
+                log.info("Recorded metric for {} with status {}", urlString, status);
+            }
         }
 
-        return joinPoint.proceed();
+        return result;
     }
 }

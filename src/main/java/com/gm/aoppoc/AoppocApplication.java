@@ -37,25 +37,14 @@ public class AoppocApplication {
                 .build();
     }
 
-    @Bean
-    public CommandLineRunner runner(ApiService apiService) {
-        return args -> {
-            String url = "https://catfact.ninja/fact";
-            log.info("Calling public API: {}", url);
-            try {
-                String response = apiService.callApi(url);
-                log.info("API call successful! Response: {}", response);
-            } catch (Exception e) {
-                log.error("API call failed: {}", e.getMessage());
-            }
-        };
-    }
-
     @Scheduled(fixedRate = 10000)
     public void reportMetrics() {
+        log.info("----Reporting Metrics----");
         meterRegistry.find("rest.template.requests").counters().forEach(counter -> {
-            log.info("Metric [rest.template.requests] for URL {}: {}", 
-                counter.getId().getTag("url"), counter.count());
+            log.info("Metric [rest.template.requests] for URL {} and STATUS {}: {}",
+                counter.getId().getTag("url"), 
+                counter.getId().getTag("status"),
+                counter.count());
         });
     }
 
