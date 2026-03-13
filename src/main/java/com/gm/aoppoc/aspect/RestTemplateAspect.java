@@ -24,7 +24,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
-@Aspect
+@Aspect // ASPECT: A class that modularizes a cross-cutting concern (logging/metrics).
 @Component
 @Slf4j
 public class RestTemplateAspect {
@@ -40,6 +40,15 @@ public class RestTemplateAspect {
         this.filterExpression = parser.parseExpression(filter);
     }
 
+    /**
+     * POINTCUT: The expression inside @Around. It defines *where* to intercept.
+     * Here it matches all methods in RestTemplate and binds the first argument to 'url'.
+     *
+     * ADVICE: This whole 'intercept' method. It's the logic that runs *around* the Join Point.
+     *
+     * JOIN POINT: Represented by 'ProceedingJoinPoint joinPoint'. It's the specific
+     * execution of the method that matched the Pointcut (e.g., a call to restTemplate.getForObject).
+     */
     @Around("execution(* org.springframework.web.client.RestTemplate.*(..)) && args(url, ..)")
     public Object intercept(ProceedingJoinPoint joinPoint, Object url) throws Throwable {
         String urlString = (url instanceof URI) ? ((URI) url).toString() : url.toString();
